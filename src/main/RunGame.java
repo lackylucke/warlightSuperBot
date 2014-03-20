@@ -23,7 +23,9 @@ import java.awt.Point;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.LinkedList;
+
 import javax.swing.SwingUtilities;
+
 import java.lang.InterruptedException;
 import java.lang.Thread;
 import java.util.zip.*;
@@ -33,6 +35,8 @@ import move.MoveResult;
 import move.PlaceArmiesMove;
 
 import org.bson.types.ObjectId;
+
+import com.mongodb.Mongo;
 import com.mongodb.MongoClient;
 import com.mongodb.MongoException;
 import com.mongodb.WriteConcern;
@@ -43,30 +47,25 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.DBCursor;
 import com.mongodb.ServerAddress;
 
-public class RunGame
-{
+public class RunGame {
 	LinkedList<MoveResult> fullPlayedGame;
 	LinkedList<MoveResult> player1PlayedGame;
 	LinkedList<MoveResult> player2PlayedGame;
 	int gameIndex = 1;
 
 	String playerName1, playerName2;
-	final String gameId,
-			bot1Id, bot2Id,
-			bot1Dir, bot2Dir;
+	final String gameId, bot1Id, bot2Id, bot1Dir, bot2Dir;
 
 	Engine engine;
 
 	DB db;
 
-	public static void main(String args[]) throws Exception
-	{	
+	public static void main(String args[]) throws Exception {
 		RunGame run = new RunGame(args);
 		run.go();
 	}
-	
-	public RunGame(String args[])
-	{
+
+	public RunGame(String args[]) {
 		this.gameId = args[0];
 		this.bot1Id = args[1];
 		this.bot2Id = args[2];
@@ -76,46 +75,45 @@ public class RunGame
 		this.playerName2 = "player2";
 	}
 
-	private void go() throws IOException, InterruptedException
-	{
+	private void go() throws IOException, InterruptedException {
 		System.out.println("starting game " + gameId);
-		
+
 		Map initMap, map;
 		Player player1, player2;
 		IORobot bot1, bot2;
 		int startingArmies;
 
-		db = new MongoClient("localhost", 27017).getDB("test");
-		
-		//setup the bots
-		bot1 = new IORobot("/opt/aigames/scripts/run_bot.sh aiplayer1 " + bot1Dir);
-		bot2 = new IORobot("/opt/aigames/scripts/run_bot.sh aiplayer2 " + bot2Dir);
+		db = new Mongo("localhost", 27017).getDB("test");
+
+		// setup the bots
+		bot1 = new IORobot("d:/eclipse_workspace/con_eng/res/runbot.bat aiplayer1 " + bot1Dir);
+		bot2 = new IORobot("d:/eclipse_workspace/con_eng/res/runbot.bat aiplayer2 " + bot2Dir);
 
 		startingArmies = 5;
 		player1 = new Player(playerName1, bot1, startingArmies);
 		player2 = new Player(playerName2, bot2, startingArmies);
 
-		//setup the map
+		// setup the map
 		initMap = makeInitMap();
 		map = setupMap(initMap);
-		
-		//start the engine
+
+		// start the engine
 		this.engine = new Engine(map, player1, player2);
-		
-		//send the bots the info they need to start
+
+		// send the bots the info they need to start
 		bot1.writeInfo("settings your_bot " + player1.getName());
 		bot1.writeInfo("settings opponent_bot " + player2.getName());
 		bot2.writeInfo("settings your_bot " + player2.getName());
 		bot2.writeInfo("settings opponent_bot " + player1.getName());
 		sendSetupMapInfo(player1.getBot(), initMap);
 		sendSetupMapInfo(player2.getBot(), initMap);
-		this.engine.distributeStartingRegions(); //decide the player's starting regions
-		this.engine.recalculateStartingArmies(); //calculate how much armies the players get at the start of the round (depending on owned SuperRegions)
+		this.engine.distributeStartingRegions(); // decide the player's starting regions
+		this.engine.recalculateStartingArmies(); // calculate how much armies the players get at the start of the round
+													// (depending on owned SuperRegions)
 		this.engine.sendAllInfo();
-		
-		//play the game
-		while(this.engine.winningPlayer() == null && this.engine.getRoundNr() <= 100)
-		{
+
+		// play the game
+		while (this.engine.winningPlayer() == null && this.engine.getRoundNr() <= 100) {
 			bot1.addToDump("Round " + this.engine.getRoundNr() + "\n");
 			bot2.addToDump("Round " + this.engine.getRoundNr() + "\n");
 			this.engine.playRound();
@@ -128,9 +126,8 @@ public class RunGame
 		finish(bot1, bot2);
 	}
 
-	//aanpassen en een QPlayer class maken? met eigen finish
-	private void finish(IORobot bot1, IORobot bot2) throws InterruptedException
-	{
+	// aanpassen en een QPlayer class maken? met eigen finish
+	private void finish(IORobot bot1, IORobot bot2) throws InterruptedException {
 		bot1.finish();
 		Thread.sleep(200);
 
@@ -143,12 +140,11 @@ public class RunGame
 		// String outputFile = this.writeOutputFile(this.gameId, this.engine.winningPlayer());
 		this.saveGame(bot1, bot2);
 
-        System.exit(0);
+		System.exit(0);
 	}
 
-	//tijdelijk handmatig invoeren
-	private Map makeInitMap()
-	{
+	// tijdelijk handmatig invoeren
+	private Map makeInitMap() {
 		Map map = new Map();
 		SuperRegion northAmerica = new SuperRegion(1, 5);
 		SuperRegion southAmerica = new SuperRegion(2, 2);
@@ -199,7 +195,7 @@ public class RunGame
 		Region region40 = new Region(40, australia);
 		Region region41 = new Region(41, australia);
 		Region region42 = new Region(42, australia);
-		
+
 		region1.addNeighbor(region2);
 		region1.addNeighbor(region4);
 		region1.addNeighbor(region30);
@@ -283,20 +279,48 @@ public class RunGame
 		region40.addNeighbor(region42);
 		region41.addNeighbor(region42);
 
-		map.add(region1); map.add(region2); map.add(region3);
-		map.add(region4); map.add(region5); map.add(region6);
-		map.add(region7); map.add(region8); map.add(region9);
-		map.add(region10); map.add(region11); map.add(region12);
-		map.add(region13); map.add(region14); map.add(region15);
-		map.add(region16); map.add(region17); map.add(region18);
-		map.add(region19); map.add(region20); map.add(region21);
-		map.add(region22); map.add(region23); map.add(region24);
-		map.add(region25); map.add(region26); map.add(region27);
-		map.add(region28); map.add(region29); map.add(region30);
-		map.add(region31); map.add(region32); map.add(region33);
-		map.add(region34); map.add(region35); map.add(region36);
-		map.add(region37); map.add(region38); map.add(region39);
-		map.add(region40); map.add(region41); map.add(region42);
+		map.add(region1);
+		map.add(region2);
+		map.add(region3);
+		map.add(region4);
+		map.add(region5);
+		map.add(region6);
+		map.add(region7);
+		map.add(region8);
+		map.add(region9);
+		map.add(region10);
+		map.add(region11);
+		map.add(region12);
+		map.add(region13);
+		map.add(region14);
+		map.add(region15);
+		map.add(region16);
+		map.add(region17);
+		map.add(region18);
+		map.add(region19);
+		map.add(region20);
+		map.add(region21);
+		map.add(region22);
+		map.add(region23);
+		map.add(region24);
+		map.add(region25);
+		map.add(region26);
+		map.add(region27);
+		map.add(region28);
+		map.add(region29);
+		map.add(region30);
+		map.add(region31);
+		map.add(region32);
+		map.add(region33);
+		map.add(region34);
+		map.add(region35);
+		map.add(region36);
+		map.add(region37);
+		map.add(region38);
+		map.add(region39);
+		map.add(region40);
+		map.add(region41);
+		map.add(region42);
 		map.add(northAmerica);
 		map.add(southAmerica);
 		map.add(europe);
@@ -306,26 +330,23 @@ public class RunGame
 
 		return map;
 	}
-	
-	//Make every region neutral with 2 armies to start with
-	private Map setupMap(Map initMap)
-	{
+
+	// Make every region neutral with 2 armies to start with
+	private Map setupMap(Map initMap) {
 		Map map = initMap;
-		for(Region region : map.regions)
-		{
+		for (Region region : map.regions) {
 			region.setPlayerName("neutral");
 			region.setArmies(2);
 		}
 		return map;
 	}
-	
-	private void sendSetupMapInfo(Robot bot, Map initMap)
-	{
+
+	private void sendSetupMapInfo(Robot bot, Map initMap) {
 		String setupSuperRegionsString, setupRegionsString, setupNeighborsString;
 		setupSuperRegionsString = getSuperRegionsString(initMap);
 		setupRegionsString = getRegionsString(initMap);
 		setupNeighborsString = getNeighborsString(initMap);
-		
+
 		bot.writeInfo(setupSuperRegionsString);
 		// System.out.println(setupSuperRegionsString);
 		bot.writeInfo(setupRegionsString);
@@ -333,106 +354,89 @@ public class RunGame
 		bot.writeInfo(setupNeighborsString);
 		// System.out.println(setupNeighborsString);
 	}
-	
-	private String getSuperRegionsString(Map map)
-	{
+
+	private String getSuperRegionsString(Map map) {
 		String superRegionsString = "setup_map super_regions";
-		for(SuperRegion superRegion : map.superRegions)
-		{
+		for (SuperRegion superRegion : map.superRegions) {
 			int id = superRegion.getId();
 			int reward = superRegion.getArmiesReward();
 			superRegionsString = superRegionsString.concat(" " + id + " " + reward);
 		}
 		return superRegionsString;
 	}
-	
-	private String getRegionsString(Map map)
-	{
+
+	private String getRegionsString(Map map) {
 		String regionsString = "setup_map regions";
-		for(Region region : map.regions)
-		{
+		for (Region region : map.regions) {
 			int id = region.getId();
 			int superRegionId = region.getSuperRegion().getId();
 			regionsString = regionsString.concat(" " + id + " " + superRegionId);
 		}
 		return regionsString;
 	}
-	
-	//beetje inefficiente methode, maar kan niet sneller wss
-	private String getNeighborsString(Map map)
-	{
+
+	// beetje inefficiente methode, maar kan niet sneller wss
+	private String getNeighborsString(Map map) {
 		String neighborsString = "setup_map neighbors";
 		ArrayList<Point> doneList = new ArrayList<Point>();
-		for(Region region : map.regions)
-		{
+		for (Region region : map.regions) {
 			int id = region.getId();
 			String neighbors = "";
-			for(Region neighbor : region.getNeighbors())
-			{
-				if(checkDoneList(doneList, id, neighbor.getId()))
-				{
+			for (Region neighbor : region.getNeighbors()) {
+				if (checkDoneList(doneList, id, neighbor.getId())) {
 					neighbors = neighbors.concat("," + neighbor.getId());
-					doneList.add(new Point(id,neighbor.getId()));
+					doneList.add(new Point(id, neighbor.getId()));
 				}
 			}
-			if(neighbors.length() != 0)
-			{
-				neighbors = neighbors.replaceFirst(","," ");
+			if (neighbors.length() != 0) {
+				neighbors = neighbors.replaceFirst(",", " ");
 				neighborsString = neighborsString.concat(" " + id + neighbors);
 			}
 		}
 		return neighborsString;
 	}
-	
-	private Boolean checkDoneList(ArrayList<Point> doneList, int regionId, int neighborId)
-	{
-		for(Point p : doneList)
-			if((p.x == regionId && p.y == neighborId) || (p.x == neighborId && p.y == regionId))
+
+	private Boolean checkDoneList(ArrayList<Point> doneList, int regionId, int neighborId) {
+		for (Point p : doneList)
+			if ((p.x == regionId && p.y == neighborId) || (p.x == neighborId && p.y == regionId))
 				return false;
 		return true;
 	}
 
-	private String getPlayedGame(Player winner, String gameView)
-	{
+	private String getPlayedGame(Player winner, String gameView) {
 		StringBuffer out = new StringBuffer();
 
 		LinkedList<MoveResult> playedGame;
-		if(gameView.equals("player1"))
+		if (gameView.equals("player1"))
 			playedGame = player1PlayedGame;
-		else if(gameView.equals("player2"))
+		else if (gameView.equals("player2"))
 			playedGame = player2PlayedGame;
 		else
 			playedGame = fullPlayedGame;
-			
+
 		playedGame.removeLast();
 		int roundNr = 2;
 		out.append("map " + playedGame.getFirst().getMap().getMapString() + "\n");
 		out.append("round 1" + "\n");
-		for(MoveResult moveResult : playedGame)
-		{
-			if(moveResult != null)
-			{
-				if(moveResult.getMove() != null)
-				{
+		for (MoveResult moveResult : playedGame) {
+			if (moveResult != null) {
+				if (moveResult.getMove() != null) {
 					try {
 						PlaceArmiesMove plm = (PlaceArmiesMove) moveResult.getMove();
 						out.append(plm.getString() + "\n");
-					}
-					catch(Exception e) {
+					} catch (Exception e) {
 						AttackTransferMove atm = (AttackTransferMove) moveResult.getMove();
 						out.append(atm.getString() + "\n");
 					}
-				out.append("map " + moveResult.getMap().getMapString() + "\n");
+					out.append("map " + moveResult.getMap().getMapString() + "\n");
 				}
-			}
-			else
-			{
+			} else {
 				out.append("round " + roundNr + "\n");
 				roundNr++;
 			}
 		}
-		
-		if(winner != null)
+
+		if (winner != null)
 			out.append(winner.getName() + " won\n");
 		else
 			out.append("Nobody won\n");
@@ -440,8 +444,7 @@ public class RunGame
 		return out.toString();
 	}
 
-	private String compressGZip(String data, String outFile)
-	{
+	private String compressGZip(String data, String outFile) {
 		try {
 			FileOutputStream fos = new FileOutputStream(outFile);
 			GZIPOutputStream gzos = new GZIPOutputStream(fos);
@@ -453,8 +456,7 @@ public class RunGame
 			gzos.close();
 
 			return outFile;
-		}
-		catch(IOException e) {
+		} catch (IOException e) {
 			System.out.println(e);
 			return "";
 		}
@@ -467,48 +469,44 @@ public class RunGame
 	public void saveGame(IORobot bot1, IORobot bot2) {
 
 		Player winner = this.engine.winningPlayer();
-		int score = this.engine.getRoundNr() - 1;
-
-		DBCollection coll = db.getCollection("games");
-
-		DBObject queryDoc = new BasicDBObject()
-			.append("_id", new ObjectId(gameId));
-
-		ObjectId bot1ObjectId = new ObjectId(bot1Id);
-		ObjectId bot2ObjectId = new ObjectId(bot2Id);
-
-		ObjectId winnerId = null;
-		if(winner != null) {
-			winnerId = winner.getName() == playerName1 ? bot1ObjectId : bot2ObjectId;
-		}
-
-		//create game directory
-		String dir = "/var/www/theaigames/public/games/" + gameId;
-		new File(dir).mkdir();
-
-		DBObject updateDoc = new BasicDBObject()
-			.append("$set", new BasicDBObject()
-				.append("winner", winnerId)
-				.append("score", score)
-				.append("visualization", 
-					compressGZip(
-						getPlayedGame(winner, "fullGame") + 
-						getPlayedGame(winner, "player1") + 
-						getPlayedGame(winner, "player2"), 
-						dir + "/visualization"
-					)
-				)
-				.append("errors", new BasicDBObject()
-					.append(bot1Id, compressGZip(bot1.getStderr(), dir + "/bot1Errors"))
-					.append(bot2Id, compressGZip(bot2.getStderr(), dir + "/bot2Errors"))
-				)
-				.append("dump", new BasicDBObject()
-					.append(bot1Id, compressGZip(bot1.getDump(), dir + "/bot1Dump"))
-					.append(bot2Id, compressGZip(bot2.getDump(), dir + "/bot2Dump"))
-				)
-				.append("ranked", 0)
-			);
 		
-		coll.findAndModify(queryDoc, updateDoc);
+		System.out.println("END");
+		System.out.println(this.engine.getRoundNr());
+		
+//		int score = this.engine.getRoundNr() - 1;
+//
+//		DBCollection coll = db.getCollection("games");
+//
+//		DBObject queryDoc = new BasicDBObject().append("_id", new ObjectId(gameId));
+//
+//		ObjectId bot1ObjectId = new ObjectId(bot1Id);
+//		ObjectId bot2ObjectId = new ObjectId(bot2Id);
+//
+//		ObjectId winnerId = null;
+//		if (winner != null) {
+//			winnerId = winner.getName() == playerName1 ? bot1ObjectId : bot2ObjectId;
+//		}
+//
+//		// create game directory
+//		String dir = "/var/www/theaigames/public/games/" + gameId;
+//		new File(dir).mkdir();
+//
+//		DBObject updateDoc = new BasicDBObject().append(
+//				"$set",
+//				new BasicDBObject()
+//						.append("winner", winnerId)
+//						.append("score", score)
+//						.append("visualization",
+//								compressGZip(getPlayedGame(winner, "fullGame") + getPlayedGame(winner, "player1")
+//										+ getPlayedGame(winner, "player2"), dir + "/visualization"))
+//						.append("errors",
+//								new BasicDBObject().append(bot1Id, compressGZip(bot1.getStderr(), dir + "/bot1Errors"))
+//										.append(bot2Id, compressGZip(bot2.getStderr(), dir + "/bot2Errors")))
+//						.append("dump",
+//								new BasicDBObject().append(bot1Id, compressGZip(bot1.getDump(), dir + "/bot1Dump"))
+//										.append(bot2Id, compressGZip(bot2.getDump(), dir + "/bot2Dump")))
+//						.append("ranked", 0));
+//
+//		coll.findAndModify(queryDoc, updateDoc);
 	}
 }
