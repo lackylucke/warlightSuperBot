@@ -20,32 +20,15 @@ package main;
 import io.IORobot;
 
 import java.awt.Point;
-import java.io.*;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedList;
-
-import javax.swing.SwingUtilities;
-
-import java.lang.InterruptedException;
-import java.lang.Thread;
-import java.util.zip.*;
+import java.util.zip.GZIPOutputStream;
 
 import move.AttackTransferMove;
 import move.MoveResult;
 import move.PlaceArmiesMove;
-
-import org.bson.types.ObjectId;
-
-import com.mongodb.Mongo;
-import com.mongodb.MongoClient;
-import com.mongodb.MongoException;
-import com.mongodb.WriteConcern;
-import com.mongodb.DB;
-import com.mongodb.DBObject;
-import com.mongodb.DBCollection;
-import com.mongodb.BasicDBObject;
-import com.mongodb.DBCursor;
-import com.mongodb.ServerAddress;
 
 public class RunGame {
 	LinkedList<MoveResult> fullPlayedGame;
@@ -57,8 +40,6 @@ public class RunGame {
 	final String gameId, bot1Id, bot2Id, bot1Dir, bot2Dir;
 
 	Engine engine;
-
-	DB db;
 
 	public static void main(String args[]) throws Exception {
 		RunGame run = new RunGame(args);
@@ -82,8 +63,6 @@ public class RunGame {
 		Player player1, player2;
 		IORobot bot1, bot2;
 		int startingArmies;
-
-		db = new Mongo("localhost", 27017).getDB("test");
 
 		// setup the bots
 		bot1 = new IORobot("d:/eclipse_workspace/con_eng/res/runbot.bat aiplayer1 " + bot1Dir);
