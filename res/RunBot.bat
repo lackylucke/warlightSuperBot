@@ -1,5 +1,2 @@
-
-cd %2
-
-javac BotStarter.java
-java BotStarter
+javac -cp src %1/BotStarter.java
+java -cp src bot.BotStarter

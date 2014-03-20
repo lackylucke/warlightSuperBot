@@ -65,8 +65,8 @@ public class RunGame {
 		int startingArmies;
 
 		// setup the bots
-		bot1 = new IORobot("d:/eclipse_workspace/con_eng/res/runbot.bat aiplayer1 " + bot1Dir);
-		bot2 = new IORobot("d:/eclipse_workspace/con_eng/res/runbot.bat aiplayer2 " + bot2Dir);
+		bot1 = new IORobot("res/runbot.bat " + bot1Dir);
+		bot2 = new IORobot("res/runbot.bat " + bot2Dir);
 
 		startingArmies = 5;
 		player1 = new Player(playerName1, bot1, startingArmies);
@@ -95,6 +95,7 @@ public class RunGame {
 		while (this.engine.winningPlayer() == null && this.engine.getRoundNr() <= 100) {
 			bot1.addToDump("Round " + this.engine.getRoundNr() + "\n");
 			bot2.addToDump("Round " + this.engine.getRoundNr() + "\n");
+			System.out.println(bot1.getDump());
 			this.engine.playRound();
 		}
 
